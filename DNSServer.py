@@ -42,6 +42,9 @@ def decrypt_with_aes(encrypted_data, password, salt):
     f = Fernet(key)
     # Handle both bytes and string input
     if isinstance(encrypted_data, str):
+        # Remove quotes if present
+        if encrypted_data.startswith('"') and encrypted_data.endswith('"'):
+            encrypted_data = encrypted_data[1:-1]
         encrypted_data = encrypted_data.encode('utf-8')
     elif not isinstance(encrypted_data, bytes):
         encrypted_data = str(encrypted_data).encode('utf-8')
@@ -49,12 +52,13 @@ def decrypt_with_aes(encrypted_data, password, salt):
     return decrypted_data.decode('utf-8')
 
 salt = 'Tandon'.encode()  # Remember it should be a byte-object
-password = "mpb9169@nyu.edu"  
+password = "mpb9169@nyu.edu"  # Your NYU email registered in Gradescope
 input_string = "AlwaysWatching"
 
 encrypted_value = encrypt_with_aes(input_string, password, salt) # exfil function
 # Fernet returns base64-encoded bytes - decode to string for TXT storage
-encrypted_string = encrypted_value.decode('utf-8')
+# Quote the string for DNS TXT record format
+encrypted_string = '"' + encrypted_value.decode('utf-8') + '"'
 decrypted_value = decrypt_with_aes(encrypted_value, password, salt)  # exfil function
 
 # For future use    
