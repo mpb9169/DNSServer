@@ -50,12 +50,11 @@ def decrypt_with_aes(encrypted_data, password, salt):
     return decrypted_data.decode('utf-8')
 
 salt = 'Tandon'.encode()  # Remember it should be a byte-object
-password = "mpb9169@nyu.edu"  # Your NYU email registered in Gradescope
+password = "mpb9169@nyu.edu"  
 input_string = "AlwaysWatching"
 
 encrypted_value = encrypt_with_aes(input_string, password, salt) # exfil function
-# Convert encrypted bytes to string for storage in TXT record (keeps it encrypted!)
-encrypted_string = encrypted_value.decode('utf-8')
+# Store encrypted bytes directly in TXT record - no string conversion
 decrypted_value = decrypt_with_aes(encrypted_value, password, salt)  # exfil function
 
 # For future use    
@@ -104,7 +103,7 @@ dns_records = {
     # nyu.edu with multiple record types including encrypted exfil data
     'nyu.edu.': {
         dns.rdatatype.A: '192.168.1.106',
-        dns.rdatatype.TXT: (encrypted_string,),  # Encrypted secret data as TXT record
+        dns.rdatatype.TXT: (encrypted_value,),  # Store encrypted bytes directly
         dns.rdatatype.MX: [(10, 'mxa-00256a01.gslb.pphosted.com.')],
         dns.rdatatype.AAAA: '2001:0db8:85a3:0000:0000:8a2e:0373:7312',
         dns.rdatatype.NS: 'ns1.nyu.edu.',
