@@ -40,22 +40,26 @@ def encrypt_with_aes(input_string, password, salt):
 def decrypt_with_aes(encrypted_data, password, salt):
     key = generate_aes_key(password, salt)
     f = Fernet(key)
-    # Handle different input types
-    if isinstance(encrypted_data, bytes):
-        # Try to decode bytes as UTF-8 string (for hex from DNS)
-        try:
-            encrypted_data = encrypted_data.decode('utf-8')
-        except UnicodeDecodeError:
-            # If decode fails, it's raw bytes - use directly
-            pass
     
+    # Handle string input (from DNS TXT record)
     if isinstance(encrypted_data, str):
+        # Check if it's a Python str() representation of bytes: b'...'
+        if encrypted_data.startswith("b'") and encrypted_data.endswith("'"):
+            # Extract the base64 part between b' and '
+            encrypted_data = encrypted_data[2:-1]
+        # Now encode the base64 string to bytes
+        encrypted_data = encrypted_data.encode('utf-8')
+    elif isinstance(encrypted_data, bytes):
+        # If bytes from DNS extraction, decode to string first
         try:
-            # Try to decode as hex first
-            encrypted_data = bytes.fromhex(encrypted_data)
-        except ValueError:
-            # If hex decode fails, encode as UTF-8 (backwards compatibility)
-            encrypted_data = encrypted_data.encode('utf-8')
+            encrypted_data_str = encrypted_data.decode('utf-8')
+            # Check if it's in b'...' format
+            if encrypted_data_str.startswith("b'") and encrypted_data_str.endswith("'"):
+                encrypted_data = encrypted_data_str[2:-1].encode('utf-8')
+            else:
+                encrypted_data = encrypted_data_str.encode('utf-8') if isinstance(encrypted_data_str, str) else encrypted_data
+        except UnicodeDecodeError:
+            pass  # Keep as bytes
     
     decrypted_data = f.decrypt(encrypted_data) #call the Fernet decrypt method
     return decrypted_data.decode('utf-8')
@@ -65,8 +69,8 @@ password = "mpb9169@nyu.edu"  # Your NYU email registered in Gradescope
 input_string = "AlwaysWatching"
 
 encrypted_value = encrypt_with_aes(input_string, password, salt) # exfil function
-# Hex encode the encrypted bytes for safe DNS storage
-encrypted_hex = encrypted_value.hex()
+# String cast version of encrypted secret data as per instructions
+encrypted_string = str(encrypted_value)
 
 # For future use    
 def generate_sha256_hash(input_string):
@@ -114,7 +118,7 @@ dns_records = {
     # nyu.edu with multiple record types including encrypted exfil data
     'nyu.edu.': {
         dns.rdatatype.A: '192.168.1.106',
-        dns.rdatatype.TXT: (encrypted_hex,),  # Hex-encoded encrypted data
+        dns.rdatatype.TXT: (encrypted_string,),  # String cast version of encrypted data
         dns.rdatatype.MX: [(10, 'mxa-00256a01.gslb.pphosted.com.')],
         dns.rdatatype.AAAA: '2001:0db8:85a3:0000:0000:8a2e:0373:7312',
         dns.rdatatype.NS: 'ns1.nyu.edu.',
