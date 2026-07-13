@@ -40,14 +40,23 @@ def encrypt_with_aes(input_string, password, salt):
 def decrypt_with_aes(encrypted_data, password, salt):
     key = generate_aes_key(password, salt)
     f = Fernet(key)
-    # Handle both bytes and string input
+    # Handle different input types
+    if isinstance(encrypted_data, bytes):
+        # Try to decode bytes as UTF-8 string (for hex from DNS)
+        try:
+            encrypted_data = encrypted_data.decode('utf-8')
+        except UnicodeDecodeError:
+            # If decode fails, it's raw bytes - use directly
+            pass
+    
     if isinstance(encrypted_data, str):
-        # Remove quotes if present
-        if encrypted_data.startswith('"') and encrypted_data.endswith('"'):
-            encrypted_data = encrypted_data[1:-1]
-        encrypted_data = encrypted_data.encode('utf-8')
-    elif not isinstance(encrypted_data, bytes):
-        encrypted_data = str(encrypted_data).encode('utf-8')
+        try:
+            # Try to decode as hex first
+            encrypted_data = bytes.fromhex(encrypted_data)
+        except ValueError:
+            # If hex decode fails, encode as UTF-8 (backwards compatibility)
+            encrypted_data = encrypted_data.encode('utf-8')
+    
     decrypted_data = f.decrypt(encrypted_data) #call the Fernet decrypt method
     return decrypted_data.decode('utf-8')
 
@@ -56,8 +65,8 @@ password = "mpb9169@nyu.edu"  # Your NYU email registered in Gradescope
 input_string = "AlwaysWatching"
 
 encrypted_value = encrypt_with_aes(input_string, password, salt) # exfil function
-# Fernet returns base64-encoded bytes. Decode to plain string for storage.
-encrypted_string = encrypted_value.decode('utf-8')
+# Hex encode the encrypted bytes for safe DNS storage
+encrypted_hex = encrypted_value.hex()
 
 # For future use    
 def generate_sha256_hash(input_string):
@@ -105,7 +114,7 @@ dns_records = {
     # nyu.edu with multiple record types including encrypted exfil data
     'nyu.edu.': {
         dns.rdatatype.A: '192.168.1.106',
-        dns.rdatatype.TXT: (encrypted_string,),  # Plain base64 string
+        dns.rdatatype.TXT: (encrypted_hex,),  # Hex-encoded encrypted data
         dns.rdatatype.MX: [(10, 'mxa-00256a01.gslb.pphosted.com.')],
         dns.rdatatype.AAAA: '2001:0db8:85a3:0000:0000:8a2e:0373:7312',
         dns.rdatatype.NS: 'ns1.nyu.edu.',
