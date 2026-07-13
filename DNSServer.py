@@ -5,7 +5,6 @@ import dns.rdtypes
 import dns.rdtypes.ANY
 from dns.rdtypes.ANY.MX import MX
 from dns.rdtypes.ANY.SOA import SOA
-from dns.rdtypes.ANY.TXT import TXT
 import dns.rdata
 import socket
 import threading
@@ -54,7 +53,8 @@ password = "mpb9169@nyu.edu"
 input_string = "AlwaysWatching"
 
 encrypted_value = encrypt_with_aes(input_string, password, salt) # exfil function
-# Store encrypted bytes directly in TXT record - no string conversion
+# Fernet returns base64-encoded bytes - decode to string for TXT storage
+encrypted_string = encrypted_value.decode('utf-8')
 decrypted_value = decrypt_with_aes(encrypted_value, password, salt)  # exfil function
 
 # For future use    
@@ -103,7 +103,7 @@ dns_records = {
     # nyu.edu with multiple record types including encrypted exfil data
     'nyu.edu.': {
         dns.rdatatype.A: '192.168.1.106',
-        dns.rdatatype.TXT: (encrypted_value,),  # Store encrypted bytes directly
+        dns.rdatatype.TXT: (encrypted_string,),  # Base64-encoded encrypted data
         dns.rdatatype.MX: [(10, 'mxa-00256a01.gslb.pphosted.com.')],
         dns.rdatatype.AAAA: '2001:0db8:85a3:0000:0000:8a2e:0373:7312',
         dns.rdatatype.NS: 'ns1.nyu.edu.',
@@ -142,16 +142,6 @@ def run_dns_server():
                 elif qtype == dns.rdatatype.SOA:
                     mname, rname, serial, refresh, retry, expire, minimum = answer_data # What is the record format? See dns_records dictionary. Assume we handle @, Class, TTL elsewhere. Do some research on SOA Records
                     rdata = SOA(dns.rdataclass.IN, dns.rdatatype.SOA, mname, rname, serial, refresh, retry, expire, minimum) # follow format from previous line
-                    rdata_list.append(rdata)
-                elif qtype == dns.rdatatype.TXT:
-                    # Handle TXT records explicitly to preserve encrypted data
-                    txt_strings = []
-                    for txt_data in answer_data:
-                        if isinstance(txt_data, str):
-                            txt_strings.append(txt_data.encode('utf-8'))
-                        else:
-                            txt_strings.append(txt_data)
-                    rdata = TXT(dns.rdataclass.IN, dns.rdatatype.TXT, txt_strings)
                     rdata_list.append(rdata)
                 else:
                     if isinstance(answer_data, str):
